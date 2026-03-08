@@ -1,0 +1,73 @@
+## Workflow nomi: Product Service uchun avtomatik CI/CD
+#name: Product Service CI/CD
+#
+## Qachon ishlaydi?
+## - master branch'ga push qilinganda (kod o'zgarganda)
+## - PR (pull request) ochilganda ham sinovdan o'tkazadi
+#on:
+#  push:
+#    branches: [ master ]
+#  pull_request:
+#    branches: [ master ]
+#
+## Ishlaydigan job (vazifa)
+#jobs:
+#  build-and-deploy:                     # Job nomi
+#    runs-on: ubuntu-latest              # GitHub serverida Ubuntu ishlatiladi
+#
+#    steps:                              # Qadamlar (ketma-ket bajariladi)
+#
+#      # 1-qadam: Repodagi kodni yuklab olish
+#      - name: Checkout code
+#        uses: actions/checkout@v4       # GitHub'dan kodni olib keladi
+#
+#      # 2-qadam: Java 17 ni o'rnatish (loyihangiz Java 17 da)
+#      - name: Set up JDK 17
+#        uses: actions/setup-java@v4
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'       # Temurin — ochiq va ishonchli Java
+#
+#      # 3-qadam: Maven paketlarini cache qilish (tezroq build uchun)
+#      - name: Cache Maven packages
+#        uses: actions/cache@v4
+#        with:
+#          path: ~/.m2                   # Maven cache joyi
+#          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}  # Cache kaliti
+#          restore-keys: ${{ runner.os }}-m2
+#
+#      # 4-qadam: Maven bilan loyihani build qilish (testlarsiz)
+#      - name: Build with Maven
+#        run: mvn clean package -DskipTests   # JAR fayl hosil qiladi
+#
+#      # 5-qadam: Docker image qurish
+#      - name: Build Docker image
+#        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/product-service:latest . # Dockerfile dan image quradi va bu compose ichida ishlatiladi (image: dockerusername/product-service:latest)
+#
+#      # 6-qadam: Docker Hub'ga kirish (push qilish uchun)
+#      - name: Login to Docker Hub
+#        uses: docker/login-action@v3
+#        with:
+#          username: ${{ secrets.DOCKER_USERNAME }}
+#          password: ${{ secrets.DOCKER_PASSWORD }}
+#
+#      # 7-qadam: Yangi image'ni Docker Hub'ga yuklash
+#      - name: Push to Docker Hub
+#        run: docker push ${{ secrets.DOCKER_USERNAME }}/product-service:latest
+#
+#      # 8-qadam: Serverga deploy qilish (faqat push bo'lganda)
+#      - name: Deploy to Server
+#        if: github.event_name == 'push'   # PR bo'lsa deploy qilmaydi
+#        env:
+#          SERVER_IP: ${{ secrets.SERVER_IP }}
+#          SSH_PORT: ${{ secrets.SSH_PORT }}
+#          SSH_USER: ${{ secrets.SSH_USER }}
+#          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+#        run: |
+#          # Serverga ssh orqali kirib quyidagi buyruqlarni bajaradi
+#          sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no -p $SSH_PORT $SSH_USER@$SERVER_IP '
+#            cd /home/${{ secrets.SSH_USER }}/microservices-infra   # serverdagi infra papka
+#            git pull origin master                                 # yangi compose ni olib keladi
+#            docker compose pull product-service                      # yangi image'ni yuklaydi
+#            docker compose up -d --no-deps product-service           # faqat product-service ni yangilaydi
+#          '
